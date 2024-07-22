@@ -64,6 +64,19 @@ func _init(node_url: String):
     print("MASTER ", master_key.hex_encode()) 
     print("CHAIN CODE ", chain_code.hex_encode())
 
-    
+    var hardened_index = 44 + 0x80000000
+    var hardened_index_bytes = PackedByteArray([
+        (hardened_index >> 24) & 0xFF,
+        (hardened_index >> 16) & 0xFF,
+        (hardened_index >> 8) & 0xFF,
+        hardened_index & 0xFF
+    ])
+    print(hardened_index_bytes)
+    var child_data = PackedByteArray([0]) + master_key + hardened_index_bytes
+    print(child_data)
+    var child_result = OpenSSL.hmac_sha512(child_data, master_key)
+    var child_key = child_result.slice(0, 32)
+    var child_chain_code = child_result.slice(32, 64)
 
-
+    print("CHILD MASTER ", child_key.hex_encode()) 
+    print("CHILD CHAIN CODE ", child_chain_code.hex_encode())

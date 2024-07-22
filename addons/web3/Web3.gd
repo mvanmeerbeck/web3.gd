@@ -80,3 +80,13 @@ func _init(node_url: String):
 
     print("CHILD MASTER ", child_key.hex_encode()) 
     print("CHILD CHAIN CODE ", child_chain_code.hex_encode())
+
+    var secp256k1_order: PackedByteArray = PackedByteArray([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41])
+
+    var child_key_mod = OpenSSL.mod(child_key, secp256k1_order)
+    var master_key_mod = OpenSSL.mod(master_key, secp256k1_order)
+    var derived_key = OpenSSL.add_mod(child_key_mod, master_key_mod, secp256k1_order)
+
+    var extended_private_key = derived_key + child_chain_code
+
+    print("EXTENDED PRIVATE KEY: ", extended_private_key.hex_encode())

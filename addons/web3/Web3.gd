@@ -30,7 +30,7 @@ func _init(node_url: String):
 
     var final_entropy = raw_binary + checksum
 
-    print(final_entropy.length())
+    print("final ENTROPY ", final_entropy)
 
     var file = FileAccess.open('res://addons/web3/english.txt', FileAccess.READ)
     var content = file.get_as_text()
@@ -51,3 +51,19 @@ func _init(node_url: String):
 
     var mnemonic_phrase = " ".join(mnemonic)
     print("Mnemonic Phrase: ", mnemonic_phrase)
+
+    var bip39_seed = OpenSSL.pbkdf2_hmac_sha512(mnemonic_phrase.to_utf8_buffer(), "mnemonic".to_utf8_buffer(), 2048, 64)
+    
+    print("BIP39 SEED ", bip39_seed.hex_encode())
+
+    var hmac_result = OpenSSL.hmac_sha512(bip39_seed, "Bitcoin seed".to_utf8_buffer())
+
+    var master_key = hmac_result.slice(0, 32)
+    var chain_code = hmac_result.slice(32, 64)
+    
+    print("MASTER ", master_key.hex_encode()) 
+    print("CHAIN CODE ", chain_code.hex_encode())
+
+    
+
+

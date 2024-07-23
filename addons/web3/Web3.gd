@@ -64,26 +64,13 @@ func _init(node_url: String):
     print("MASTER ", master_key.hex_encode()) 
     print("CHAIN CODE ", chain_code.hex_encode())
 
-    var child = derive_child_key(master_key, chain_code, 44, true)
-    print(child.key.hex_encode())
-    print(child.chain_code.hex_encode())
-
-    var childchild = derive_child_key(child.key, child.chain_code, 60, true)
-    print(childchild.key.hex_encode())
-    print(childchild.chain_code.hex_encode())
-
-    var childchildchild = derive_child_key(childchild.key, childchild.chain_code, 0, true)
-    print(childchildchild.key.hex_encode())
-    print(childchildchild.chain_code.hex_encode())
-
-    var childchildchildchild = derive_child_key(childchildchild.key, childchildchild.chain_code, 0, false)
-    print(childchildchildchild.key.hex_encode())
-    print(childchildchildchild.chain_code.hex_encode())
+    var derived = derive_path("m/44'/60'/0'", master_key, chain_code)
+    print("Derived key: ", derived["key"].hex_encode())
+    print("Derived chain code: ", derived["chain_code"].hex_encode())
 
     #var extended_private_key = derived_key + child_chain_code
 
     #print("EXTENDED PRIVATE KEY: ", extended_private_key.hex_encode())
-
 
 func derive_child_key(parent_key: PackedByteArray, parent_chain_code: PackedByteArray, index: int, hardened: bool) -> Dictionary:
     var hardened_index = index + 0x80000000
@@ -107,3 +94,27 @@ func derive_child_key(parent_key: PackedByteArray, parent_chain_code: PackedByte
         "chain_code": child_chain_code
     }
 
+func derive_path(path: String, master_key: PackedByteArray, master_chain_code: PackedByteArray) -> Dictionary:
+    var segments = path.split("/")
+    var current_key = master_key
+    var current_chain_code = master_chain_code
+
+    for segment in segments:
+        if segment == "m":
+            continue
+        var hardened = segment.ends_with("'")
+        var index = 0
+
+        if hardened:
+            index = int(segment.left(-1))
+        else:
+            index = int(segment)
+
+        var derive_child = derive_child_key(current_key, current_chain_code, index, hardened)
+        current_key = derive_child.key
+        current_chain_code = derive_child.chain_code
+
+    return {
+        "key": current_key,
+        "chain_code": current_chain_code
+    }

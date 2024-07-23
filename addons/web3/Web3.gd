@@ -64,29 +64,46 @@ func _init(node_url: String):
     print("MASTER ", master_key.hex_encode()) 
     print("CHAIN CODE ", chain_code.hex_encode())
 
-    var hardened_index = 44 + 0x80000000
+    var child = derive_child_key(master_key, chain_code, 44, true)
+    print(child.key.hex_encode())
+    print(child.chain_code.hex_encode())
+
+    var childchild = derive_child_key(child.key, child.chain_code, 60, true)
+    print(childchild.key.hex_encode())
+    print(childchild.chain_code.hex_encode())
+
+    var childchildchild = derive_child_key(childchild.key, childchild.chain_code, 0, true)
+    print(childchildchild.key.hex_encode())
+    print(childchildchild.chain_code.hex_encode())
+
+    var childchildchildchild = derive_child_key(childchildchild.key, childchildchild.chain_code, 0, false)
+    print(childchildchildchild.key.hex_encode())
+    print(childchildchildchild.chain_code.hex_encode())
+
+    #var extended_private_key = derived_key + child_chain_code
+
+    #print("EXTENDED PRIVATE KEY: ", extended_private_key.hex_encode())
+
+
+func derive_child_key(parent_key: PackedByteArray, parent_chain_code: PackedByteArray, index: int, hardened: bool) -> Dictionary:
+    var hardened_index = index + 0x80000000
     var hardened_index_bytes = PackedByteArray([
         (hardened_index >> 24) & 0xFF,
         (hardened_index >> 16) & 0xFF,
         (hardened_index >> 8) & 0xFF,
         hardened_index & 0xFF
     ])
-    print(hardened_index_bytes)
-    var child_data = PackedByteArray([0]) + master_key + hardened_index_bytes
-    print(child_data)
-    var child_result = OpenSSL.hmac_sha512(child_data, master_key)
+    
+    var child_data = PackedByteArray([0]) + parent_key + hardened_index_bytes
+    var child_result = OpenSSL.hmac_sha512(child_data, parent_chain_code)
     var child_key = child_result.slice(0, 32)
     var child_chain_code = child_result.slice(32, 64)
+    
+    var secp256k1_order = PackedByteArray([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41])
+    var derived_key = OpenSSL.add_mod(child_key, parent_key, secp256k1_order)
+    
+    return {
+        "key": derived_key,
+        "chain_code": child_chain_code
+    }
 
-    print("CHILD MASTER ", child_key.hex_encode()) 
-    print("CHILD CHAIN CODE ", child_chain_code.hex_encode())
-
-    var secp256k1_order: PackedByteArray = PackedByteArray([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41])
-
-    var child_key_mod = OpenSSL.mod(child_key, secp256k1_order)
-    var master_key_mod = OpenSSL.mod(master_key, secp256k1_order)
-    var derived_key = OpenSSL.add_mod(child_key_mod, master_key_mod, secp256k1_order)
-
-    var extended_private_key = derived_key + child_chain_code
-
-    print("EXTENDED PRIVATE KEY: ", extended_private_key.hex_encode())

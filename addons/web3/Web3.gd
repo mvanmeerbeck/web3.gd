@@ -64,25 +64,35 @@ func _init(node_url: String):
     print("MASTER ", master_key.hex_encode()) 
     print("CHAIN CODE ", chain_code.hex_encode())
 
-    var derived = derive_path("m/44'/60'/0'", master_key, chain_code)
-    print("Derived key: ", derived["key"].hex_encode())
-    print("Derived chain code: ", derived["chain_code"].hex_encode())
+    var derived = derive_path("m/44'/60'/0'/0/0", master_key, chain_code)
+    print("Derived key: ", derived.key.hex_encode())
+    print("Derived chain code: ", derived.chain_code.hex_encode())
+    print("Derived pub: ", OpenSSL.calculate_public_key(derived.key).hex_encode())
 
     #var extended_private_key = derived_key + child_chain_code
 
     #print("EXTENDED PRIVATE KEY: ", extended_private_key.hex_encode())
 
 func derive_child_key(parent_key: PackedByteArray, parent_chain_code: PackedByteArray, index: int, hardened: bool) -> Dictionary:
-    var hardened_index = index + 0x80000000
-    var hardened_index_bytes = PackedByteArray([
-        (hardened_index >> 24) & 0xFF,
-        (hardened_index >> 16) & 0xFF,
-        (hardened_index >> 8) & 0xFF,
-        hardened_index & 0xFF
-    ])
+    if hardened:
+        index += 0x80000000
     
-    var child_data = PackedByteArray([0]) + parent_key + hardened_index_bytes
-    var child_result = OpenSSL.hmac_sha512(child_data, parent_chain_code)
+    var index_bytes = PackedByteArray([
+        (index >> 24) & 0xFF,
+        (index >> 16) & 0xFF,
+        (index >> 8) & 0xFF,
+        index & 0xFF
+    ])
+    print("HARDEN ", hardened)
+    var data: PackedByteArray
+    if hardened:
+        data = PackedByteArray([0]) + parent_key + index_bytes
+    else:
+        var public_key = OpenSSL.calculate_public_key(parent_key)
+        print("Pub ", public_key.hex_encode())
+        data = public_key + index_bytes
+
+    var child_result = OpenSSL.hmac_sha512(data, parent_chain_code)
     var child_key = child_result.slice(0, 32)
     var child_chain_code = child_result.slice(32, 64)
     
@@ -113,6 +123,9 @@ func derive_path(path: String, master_key: PackedByteArray, master_chain_code: P
         var derive_child = derive_child_key(current_key, current_chain_code, index, hardened)
         current_key = derive_child.key
         current_chain_code = derive_child.chain_code
+
+        print("PATH KEY ", current_key.hex_encode())
+        print("PATH CHAIN CODE ", current_chain_code.hex_encode())
 
     return {
         "key": current_key,

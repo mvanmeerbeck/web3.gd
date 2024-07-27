@@ -1,8 +1,9 @@
-extends Object
-
 class_name Web3
 
-func _init(node_url: String):
+var node: Node
+
+func _init(node: Node, node_url: String):
+    self.node = node
     var crypto = Crypto.new()
     var entropy = crypto.generate_random_bytes(32)
     var raw_binary = ''
@@ -72,6 +73,27 @@ func _init(node_url: String):
     #var extended_private_key = derived_key + child_chain_code
 
     #print("EXTENDED PRIVATE KEY: ", extended_private_key.hex_encode())
+
+    # connect to node
+
+
+    #http_request.request_completed.connect(self._http_request_completed)
+
+    var http_request = HTTPRequest.new()
+    self.node.add_child(http_request)
+    http_request.request_completed.connect(self._http_request_completed)
+
+    var body = JSON.new().stringify({"method":"eth_chainId","params":[],"id":1,"jsonrpc":"2.0"})
+    var error = http_request.request("https://rpc-amoy.polygon.technology", ["Content-type: application/json"], HTTPClient.METHOD_POST, body)
+
+    print(error)
+  
+
+func _http_request_completed(result, response_code, headers, body):
+    var json = JSON.new()
+    json.parse(body.get_string_from_utf8())
+    var response = json.get_data()
+    print(response)
 
 func derive_child_key(parent_key: PackedByteArray, parent_chain_code: PackedByteArray, index: int, hardened: bool) -> Dictionary:
     if hardened:

@@ -98,7 +98,7 @@ func _init(node: Node, node_url: String):
     var value = PackedByteArray([0x3B, 0x9A, 0xCA, 0x00])  # ETH value to transfer
     var gas_price = PackedByteArray([0xB, 0xA4, 0x3B, 0x74, 0x00])  # Gas price in wei (50 gwei)
     var gas_limit = PackedByteArray([0x52, 0x08])  # Gas limit for a standard ETH transfer
-    var nonce = PackedByteArray([0x10])  # Replace with the actual nonce for the sender's account
+    var nonce = PackedByteArray([0xa])  # Replace with the actual nonce for the sender's account
     var chain_id = PackedByteArray([0x01, 0x38, 0x82])  # Mainnet chain ID
 
     var transaction_array = [

@@ -74,20 +74,112 @@ func _init(node: Node, node_url: String):
 
     #print("EXTENDED PRIVATE KEY: ", extended_private_key.hex_encode())
 
+    var message = "foobar"
+    var message_bytes = message.to_utf8_buffer()
+    var prefix = "\u0019Ethereum Signed Message:\n" + str(message_bytes.size())
+    var prefixed_message = prefix.to_utf8_buffer() + message_bytes
+
+    var data: PackedByteArray = OpenSSL.keccak256(prefixed_message)
+    print("Data: ", data.hex_encode())
+    var signature: PackedByteArray = OpenSSL.sign(derived.key, data)
+    print("sig ", signature.hex_encode())
+
     # connect to node
-
-
-    #http_request.request_completed.connect(self._http_request_completed)
-
     var http_request = HTTPRequest.new()
     self.node.add_child(http_request)
     http_request.request_completed.connect(self._http_request_completed)
 
-    var body = JSON.new().stringify({"method":"eth_chainId","params":[],"id":1,"jsonrpc":"2.0"})
-    var error = http_request.request("https://rpc-amoy.polygon.technology", ["Content-type: application/json"], HTTPClient.METHOD_POST, body)
+    #var body = JSON.new().stringify({"method":"eth_chainId","params":[],"id":1,"jsonrpc":"2.0"})
+    #var error = http_request.request("https://rpc-amoy.polygon.technology", ["Content-type: application/json"], HTTPClient.METHOD_POST, body)
 
-    print(error)
-  
+    #print("error ", error)
+
+    var receiver = PackedByteArray([0x30, 0xa3, 0xc1, 0x25, 0xfd, 0x83, 0x7A, 0x07, 0x05, 0x24, 0x94, 0xd3, 0xEc, 0x2a, 0x80, 0x2c, 0x9a, 0x24, 0xc8, 0xbF])
+    var value = PackedByteArray([0x3B, 0x9A, 0xCA, 0x00])  # ETH value to transfer
+    var gas_price = PackedByteArray([0xB, 0xA4, 0x3B, 0x74, 0x00])  # Gas price in wei (50 gwei)
+    var gas_limit = PackedByteArray([0x52, 0x08])  # Gas limit for a standard ETH transfer
+    var nonce = PackedByteArray([0x10])  # Replace with the actual nonce for the sender's account
+    var chain_id = PackedByteArray([0x01, 0x38, 0x82])  # Mainnet chain ID
+
+    var transaction_array = [
+        nonce,
+        gas_price,
+        gas_limit,
+        receiver,
+        value,
+        PackedByteArray(),
+        chain_id,
+        PackedByteArray(),
+        PackedByteArray()
+    ]
+
+    print(nonce.hex_encode(), ", ", gas_price.hex_encode(), ", ", gas_limit.hex_encode(), ", ", receiver.hex_encode(), ", ", value.hex_encode(), ", ", PackedByteArray().hex_encode(), ", ", chain_id.hex_encode())
+    var rlp_encoded = encode_rlp(transaction_array)
+    print("rlp ", rlp_encoded.hex_encode())
+    var hash = OpenSSL.keccak256(rlp_encoded)
+    print("hash2 ", hash.hex_encode())
+    var signature2: PackedByteArray = OpenSSL.sign(derived.key, hash)
+    print("sig2 ", signature2.hex_encode())
+    var r = remove_leading_zeros(signature2.slice(0, 32))
+    var s = remove_leading_zeros(signature2.slice(32, 64))
+    var v = PackedByteArray([0x2, 0x71, 0x27])
+
+    print("r ", r.hex_encode())
+    print("s ", s.hex_encode())
+
+    transaction_array = [
+        nonce,
+        gas_price,
+        gas_limit,
+        receiver,
+        value,
+        PackedByteArray(),
+        v,
+        r,
+        s
+    ]
+
+    var signed_rlp_encoded = encode_rlp(transaction_array)
+    print("0x" + signed_rlp_encoded.hex_encode())
+    var body2 = JSON.new().stringify({
+        "method": "eth_sendRawTransaction",
+        "params": ["0x" + signed_rlp_encoded.hex_encode()],
+        "id": 1,
+        "jsonrpc": "2.0"
+    })
+    var error2 = http_request.request("https://rpc-amoy.polygon.technology", ["Content-type: application/json"], HTTPClient.METHOD_POST, body2)
+    print("error2 ", error2)
+
+func remove_leading_zeros(data: PackedByteArray) -> PackedByteArray:
+    var i = 0
+    while i < data.size() and data[i] == 0:
+        i += 1
+    return data.slice(i, data.size() - i)
+
+# Function to encode bytes in RLP
+func encode_bytes(bytes: PackedByteArray) -> PackedByteArray:
+    if bytes.size() == 1 and bytes[0] < 0x80:
+        return bytes
+    else:
+        return encode_length(bytes.size(), 0x80) + bytes
+
+# Function to encode the length in RLP
+func encode_length(length: int, offset: int) -> PackedByteArray:
+    if length < 56:
+        return PackedByteArray([length + offset])
+    else:
+        var length_bytes = PackedByteArray()
+        while length > 0:
+            length_bytes.insert(0, length & 0xff)
+            length >>= 8
+        return PackedByteArray([length_bytes.size() + offset + 55]) + length_bytes
+
+# Main function to encode a transaction array in RLP (only PackedByteArray)
+func encode_rlp(transaction_array: Array) -> PackedByteArray:
+    var encoded_items = PackedByteArray()
+    for item in transaction_array:
+        encoded_items += encode_bytes(item)
+    return encode_length(encoded_items.size(), 0xc0) + encoded_items
 
 func _http_request_completed(result, response_code, headers, body):
     var json = JSON.new()
